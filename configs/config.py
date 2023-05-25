@@ -30,6 +30,7 @@ def get_cfg_defaults():
 
 
 def parse_cfg(cfg):
+    # assigns logging directory from default.yaml and adventure.yaml for the respective subject.
     cfg.logdir = os.path.join('experiments', cfg.category, cfg.task, cfg.subject, cfg.experiment)
 
 
@@ -51,12 +52,17 @@ def determine_primary_secondary_gpus(cfg):
 
 
 def make_cfg(args):
+    # get default.yaml args
     cfg = get_cfg_defaults()
+    # merge_from_file from yacs
+    # loads a yaml congfig file and merges it
+    # with current cfg
     cfg.merge_from_file('configs/default.yaml')
     cfg.merge_from_file(args.cfg)
     cfg.merge_from_list(args.opts)
+    # assign logging directory
     parse_cfg(cfg)
-
+    # set primary/ secondary GPU if available.
     determine_primary_secondary_gpus(cfg)
         
     return cfg

@@ -16,8 +16,11 @@ from core.utils.image_util import tile_images, to_8b_image
 
 from configs import cfg
 
+# return MSE of x,y
 img2mse = lambda x, y : torch.mean((x - y) ** 2)
+# return E[|x-y|]
 img2l1 = lambda x, y : torch.mean(torch.abs(x-y))
+# convert to unit8
 to8b = lambda x : (255.*np.clip(x,0.,1.)).astype(np.uint8)
 
 EXCLUDE_KEYS_TO_GPU = ['frame_name', 'img_width', 'img_height']
@@ -36,6 +39,8 @@ def _unpack_imgs(rgbs, patch_masks, bgcolor, targets, div_indices):
 
 
 def scale_for_lpips(image_tensor):
+    # scale images between -1 and 1
+    # for lpips computation.
     return image_tensor * 2. - 1.
 
 
@@ -97,7 +102,9 @@ class Trainer(object):
 
     def get_loss(self, net_output, 
                  patch_masks, bgcolor, targets, div_indices):
-
+        # loss = L_lpips + lambda*L_mse
+        # lambda is a hyper parameter 
+        # set from the default.yaml file.
         lossweights = cfg.train.lossweights
         loss_names = list(lossweights.keys())
 
@@ -108,20 +115,24 @@ class Trainer(object):
                                      targets, div_indices), 
                         targets)
 
+        # multiply the loss weigths to the losses
         train_losses = [
             weight * losses[k] for k, weight in lossweights.items()
         ]
 
+        # return overall loss and individual losses over time.
         return sum(train_losses), \
                {loss_names[i]: train_losses[i] for i in range(len(loss_names))}
 
     def train_begin(self, train_dataloader):
         assert train_dataloader.batch_size == 1
-
+        # model.train() set 
+        # network to train mode
         self.network.train()
         cfg.perturb = cfg.train.perturb
 
     def train_end(self):
+        # nothing happens
         pass
 
     def train(self, epoch, train_dataloader):

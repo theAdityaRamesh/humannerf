@@ -10,6 +10,9 @@ def _query_network():
 
 
 def create_network():
+    # get network class object
     network = _query_network()
+    # create an instace of network class
     network = network()
+    # return network class instance.
     return network

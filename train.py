@@ -19,8 +19,11 @@ def main():
     # estimate start epoch
     epoch = trainer.iter // len(train_loader) + 1
     while True:
+
         if trainer.iter > cfg.train.maxiter:
+            # stop when num iter exceeds max iter
             break
+        
         
         trainer.train(epoch=epoch,
                       train_dataloader=train_loader)
