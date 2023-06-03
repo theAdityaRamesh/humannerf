@@ -1,7 +1,7 @@
 # HumanNeRF: Free-viewpoint Rendering of Moving People from Monocular Video (CVPR 2022)
 
 ## Change Log
-
+ - Updated Files with comments on what the functions do (OnGoing).
 ## To_Do
 - [ ] Find out what the motion_weight_prior(gaussian bone volume work).
 - [ ] Understand the tpose.py dataset class and the tpose rendering process from run.py
