@@ -32,13 +32,18 @@ class Dataset(torch.utils.data.Dataset):
             **_):
 
         print('[Dataset Path]', dataset_path) 
-
+        # datasetpath from dataset_args.py
         self.dataset_path = dataset_path
+        # image directory in dataset_path/images
         self.image_dir = os.path.join(dataset_path, 'images')
-
+        # load cannonical joints and bbox 
+        # obtained from cononical skeleton
         self.canonical_joints, self.canonical_bbox = \
             self.load_canonical_joints()
 
+
+        # ???????
+        # go to this function and write comments
         if 'motion_weights_priors' in keyfilter:
             self.motion_weights_priors = \
                 approx_gaussian_bone_volumes(
@@ -47,36 +52,44 @@ class Dataset(torch.utils.data.Dataset):
                     self.canonical_bbox['max_xyz'],
                     grid_size=cfg.mweight_volume.volume_size).astype('float32')
 
-
+        # load cameras from cameras.pkl
         self.cameras = self.load_train_cameras()
+        # load mesh_infos dict from mesh_info.pkl
         self.mesh_infos = self.load_train_mesh_infos()
-
+        # get train frames from dataset/zju_mocap/images
         framelist = self.load_train_frames()
 
-        # change framelist to
-        # framelist[1:skip:end]
+        # reduce number of frames if skip > 1
+        # skip is from core.data.create_dataset.create_dataset
+        # args['skip'] = cfg.render_skip 
+        # default skip = 1
         self.framelist = framelist[::skip]
 
         # restrict to only maxframes number of frames.
         if maxframes > 0:
             self.framelist = self.framelist[:maxframes]
+
         # print(len(self.framelist))
         print(f' -- Total Frames: {self.get_total_frames()}')
 
+        # keyfilter, src_type, ray_shoot_mode from dataset_args.py
+        # bgcolor from adventure.yaml
         self.keyfilter = keyfilter
         self.bgcolor = bgcolor
         self.ray_shoot_mode = ray_shoot_mode
     
-    # $$$$$$$$$$$$$$$$$
-    # is this the joints of the canonical pose ?
-    # $$$$$$$$$$$$$$$$$
+   
     def load_canonical_joints(self):
+        # create the path to canonical joints pkl file
         cl_joint_path = os.path.join(self.dataset_path, 'canonical_joints.pkl')
+        # open the pkl file
         with open(cl_joint_path, 'rb') as f:
             cl_joint_data = pickle.load(f)
+        # get the canonical joints from the .pkl file
         canonical_joints = cl_joint_data['joints'].astype('float32')
+        # create a bbox from canonical skeleton
         canonical_bbox = self.skeleton_to_bbox(canonical_joints)
-
+        # return bbox and joints
         return canonical_joints, canonical_bbox
 
     # load train cameras from cameras.pkl
@@ -101,11 +114,15 @@ class Dataset(torch.utils.data.Dataset):
         mesh_infos = None
         with open(os.path.join(self.dataset_path, 'mesh_infos.pkl'), 'rb') as f:   
             mesh_infos = pickle.load(f)
-
+        # get frame_name from mesh_info.keys()
         for frame_name in mesh_infos.keys():
+            # set bbox to bbox obtained from the joints for each frame
             bbox = self.skeleton_to_bbox(mesh_infos[frame_name]['joints'])
+            # for each frame store bbox as a dict with
+            # key 'bbox' and value bbox
+            # in the frame_name th index of the mesh_infos list
             mesh_infos[frame_name]['bbox'] = bbox
-
+        # return mesh_infos for all frames as list
         return mesh_infos
 
     # dataset path from dataset args
@@ -114,6 +131,11 @@ class Dataset(torch.utils.data.Dataset):
                                exts=['.png'])
         return [split_path(ipath)[1] for ipath in img_paths]
     
+    # different from the query_dst_skeleton
+    # in freeview.py, contains the frame_name 
+    # argument that allows us to choose the key-value
+    # correspoinding to a particular frame.
+    # in freeview frame is fixed, here all frames have to be queried
     def query_dst_skeleton(self, frame_name):
         return {
             'poses': self.mesh_infos[frame_name]['poses'].astype('float32'),
@@ -241,6 +263,7 @@ class Dataset(torch.utils.data.Dataset):
                 inter_mask[y_min:y_max, x_min:x_max], \
                 np.array([x_min, y_min]), np.array([x_max, y_max])
     
+    # same as freeview.py
     def load_image(self, frame_name, bg_color):
         imagepath = os.path.join(self.image_dir, '{}.png'.format(frame_name))
         orig_img = np.array(load_image(imagepath))
@@ -307,31 +330,45 @@ class Dataset(torch.utils.data.Dataset):
         return self.get_total_frames()
 
     def __getitem__(self, idx):
+        # idx represents the training frame
+        # number which is being used for 
+        # training.
         frame_name = self.framelist[idx]
         results = {
             'frame_name': frame_name
         }
-
+        # bgcolor from adventure.yaml
         if self.bgcolor is None:
             bgcolor = (np.random.rand(3) * 255.).astype('float32')
         else:
             bgcolor = np.array(self.bgcolor, dtype='float32')
-
+        # load the corresponding image from the frame_name
+        # with background == bgcolor
         img, alpha = self.load_image(frame_name, bgcolor)
         img = (img / 255.).astype('float32')
-
+        # get the height,width of the image
         H, W = img.shape[0:2]
-
+        # here we pass the frame_name as argument
+        # in freeview no need to pass frame_name 
+        # here frame_name corresponds to the training
+        # frame.
         dst_skel_info = self.query_dst_skeleton(frame_name)
         dst_bbox = dst_skel_info['bbox']
         dst_poses = dst_skel_info['poses']
         dst_tpose_joints = dst_skel_info['dst_tpose_joints']
-
+        
+        # check that a camera exists for the specified frame.
+        # in the cameras.pkl file
         assert frame_name in self.cameras
+        # get the K camera matrix from the cameras.pkl file
+        # using the frame_name
+        # in freeview.py we get K,E according to the frame indx
+        # from get_freeview_camera function
         K = self.cameras[frame_name]['intrinsics'][:3, :3].copy()
         K[:2] *= cfg.resize_img_scale
-
+        # get the E matrix from the cameras.pkl file according to the frame number
         E = self.cameras[frame_name]['extrinsics']
+        # transform camera to world coordinates ??
         E = apply_global_tfm_to_camera(
                 E=E, 
                 Rh=dst_skel_info['Rh'],

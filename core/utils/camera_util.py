@@ -101,10 +101,17 @@ def rotate_camera_by_frame_idx(
     Returns:
         - Array (3, 3)
     """
-
+    # extrinsics : Train camera extrinsics
+    # frame_idx \in {1,len(framelist)}
+    # period = len(framelist)
+    # divide 2*\pi into period number of parts
+    # current camera angle = frame_idx
     angle = 2 * np.pi * (frame_idx / period)
+    # inv angle rotates in the other direction
     if inv_angle:
         angle = -angle
+    # use update extrinsics function to get the
+    # new camera extrinsic matrix
     return _update_extrinsics(
                 extrinsics, angle, trans, rotate_axis)
 

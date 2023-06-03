@@ -95,6 +95,7 @@ class Dataset(torch.utils.data.Dataset):
         # from the mesh_info.pkl file
         self.train_mesh_info = mesh_infos[framelist[self.train_frame_idx]]
         # keyfilter, src_type from dataset_args.py
+        # bgcolor from adventure.yaml
         self.bgcolor = bgcolor if bgcolor is not None else [255., 255., 255.]
         self.keyfilter = keyfilter
         self.src_type = src_type
@@ -160,6 +161,7 @@ class Dataset(torch.utils.data.Dataset):
         return [split_path(ipath)[1] for ipath in img_paths]
     
     def query_dst_skeleton(self):
+        #create a dict of these entries and return it
         return {
             'poses': self.train_mesh_info['poses'].astype('float32'),
             'dst_tpose_joints': \
@@ -170,6 +172,12 @@ class Dataset(torch.utils.data.Dataset):
         }
 
     def get_freeview_camera(self, frame_idx, total_frames, trans=None):
+        # for freeview rendering rotate the camera around the subject
+        # w.r.t to number of frames, ie: camera position is a function
+        # of number of rendered frames.
+        # get extrinsic camera location using 
+        # rotate_camera_by_frame_idx 
+        # function.
         E = rotate_camera_by_frame_idx(
                 extrinsics=self.train_camera['extrinsics'], 
                 frame_idx=frame_idx,
@@ -178,6 +186,8 @@ class Dataset(torch.utils.data.Dataset):
                 **self.ROT_CAM_PARAMS[self.src_type])
         K = self.train_camera['intrinsics'].copy()
         K[:2] *= cfg.resize_img_scale
+        # return updated K and E camera pose matrices
+        # corresponding to the frame index
         return K, E
 
     def load_image(self, frame_name, bg_color):
@@ -186,12 +196,15 @@ class Dataset(torch.utils.data.Dataset):
             without background
             return resized image
         '''
+        # imagepath = dataset/zju_mocap/{sub}/images/{frame_name.png}
         imagepath = os.path.join(self.image_dir, '{}.png'.format(frame_name))
+        # load image present at image path
         orig_img = np.array(load_image(imagepath))
-
+        # get maskpath
         maskpath = os.path.join(self.dataset_path, 
                                 'masks', 
                                 '{}.png'.format(frame_name))
+        # load the mask
         alpha_mask = np.array(load_image(maskpath))
         
         # https://docs.opencv.org/4.x/dc/dbb/tutorial_py_calibration.html
@@ -201,7 +214,7 @@ class Dataset(torch.utils.data.Dataset):
             D = self.train_camera['distortions']
             orig_img = cv2.undistort(orig_img, K, D)
             alpha_mask = cv2.undistort(alpha_mask, K, D)
-
+        # convert range alpha_mask to (0,1)
         alpha_mask = alpha_mask / 255.
         # mask out the background pixels by using the alpha mask
         # colour the non-foregroung pixels to bg_color
@@ -217,42 +230,56 @@ class Dataset(torch.utils.data.Dataset):
                                     fx=cfg.resize_img_scale,
                                     fy=cfg.resize_img_scale,
                                     interpolation=cv2.INTER_LINEAR)
-                                
+        # return the image and alpha_mask
         return img, alpha_mask
 
     def __len__(self):
         return self.total_frames
 
     def __getitem__(self, idx):
+        # idx represents one of the {1,cfg.render_frames}
+        # number of frames, the freeview frame is already
+        # fixed from the cfg.freeview.frame_idx argument
+        # given through cmdline.
+
+        # train_frame_name = framelist[self.frame_idx]
         frame_name = self.train_frame_name
+        # freeview Dataset class returns a dict results
+        # set key value pair 'frame_name' : frame_name
         results = {
             'frame_name': frame_name
         }
-
+        # bgcolor from adventure.yaml
         bgcolor = np.array(self.bgcolor, dtype='float32')
-
+        # load the corresponding image from the frame_name
+        # with background == bgcolor
         img, _ = self.load_image(frame_name, bgcolor)
+        # clip image b/w (0,1)
         img = img / 255.
+        # get height and width of image
         H, W = img.shape[0:2]
-
+        # get the dataset skeleton info
         dst_skel_info = self.query_dst_skeleton()
         dst_bbox = dst_skel_info['bbox']
         dst_poses = dst_skel_info['poses']
         dst_tpose_joints = dst_skel_info['dst_tpose_joints']
         dst_Rh = dst_skel_info['Rh']
         dst_Th = dst_skel_info['Th']
-
+        # get the K,E matrices according 
+        # to the frame index.
         K, E = self.get_freeview_camera(
                         frame_idx=idx,
                         total_frames=self.total_frames,
                         trans=dst_Th)
+        # use the E matrix to apply camera transformation
+        # and get the updated camera pose
         E = apply_global_tfm_to_camera(
                 E=E, 
                 Rh=dst_Rh,
                 Th=dst_Th)
         R = E[:3, :3]
         T = E[:3, 3]
-
+        
         rays_o, rays_d = get_rays_from_KRT(H, W, K, R, T)
         rays_o = rays_o.reshape(-1, 3) # (H, W, 3) --> (N_rays, 3)
         rays_d = rays_d.reshape(-1, 3)

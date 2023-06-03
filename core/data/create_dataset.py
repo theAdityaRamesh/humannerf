@@ -22,6 +22,10 @@ def _query_dataset(data_type):
     #   module_path : core/data.human_nerf/freeview.py
     #   module : core.data.human_nerf.freeview
     dataset = imp.load_source(module, module_path).Dataset
+    # datatype
+    #   - freeview -> freeview.py
+    #   - tpose -> tpose.py
+    #   - movement/train -> train.py
     return dataset
 
 
@@ -37,6 +41,7 @@ def _get_total_train_imgs(dataset_path):
 
 def create_dataset(data_type='train'):
     # get dataset name from adventure.yaml
+    # dataset_name : zju_{sub}_{train/test}
     dataset_name = cfg[data_type].dataset
     # get dataset args corresponding to dataset name
     # common to all data_types : train/freeview/movement
@@ -53,7 +58,7 @@ def create_dataset(data_type='train'):
         args['skip'] = cfg.render_skip
 
     # get dataset class instance according to datatype
-    # from freeview/movement/train .py
+    # from freeview/tpose/train .py
     dataset = _query_dataset(data_type)
     # create an instance of the dataset class.
     # initialize its constructor using args

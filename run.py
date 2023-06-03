@@ -187,8 +187,9 @@ def run_tpose():
 
 def run_movement(render_folder_name='movement'):
     cfg.perturb = 0.
-
+    # create instance of network 
     model = load_network()
+    # create dataloader of type movement
     test_loader = create_dataloader('movement')
     writer = ImageWriter(
         output_dir=os.path.join(cfg.logdir, cfg.load_net),
