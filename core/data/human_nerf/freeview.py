@@ -22,6 +22,7 @@ from configs import cfg
 
 
 class Dataset(torch.utils.data.Dataset):
+    # parameters to rotate the camera.
     ROT_CAM_PARAMS = {
         'zju_mocap': {'rotate_axis': 'z', 'inv_angle': True},
         'wild': {'rotate_axis': 'y', 'inv_angle': False}
@@ -36,15 +37,19 @@ class Dataset(torch.utils.data.Dataset):
             bgcolor=None,
             src_type="zju_mocap",
             **_):
-
+        
         print('[Dataset Path]', dataset_path) 
-
+        # datasetpath from dataset_args.py
         self.dataset_path = dataset_path
+        # image directory in dataset_path/images
         self.image_dir = os.path.join(dataset_path, 'images')
-
+        # load cannonical joints and bbox 
+        # obtained from cononical skeleton
         self.canonical_joints, self.canonical_bbox = \
             self.load_canonical_joints()
-
+        
+        # ???????
+        # go to this function and write comments
         if 'motion_weights_priors' in keyfilter:
             self.motion_weights_priors = \
                 approx_gaussian_bone_volumes(
@@ -53,16 +58,26 @@ class Dataset(torch.utils.data.Dataset):
                     self.canonical_bbox['max_xyz'],
                     grid_size=cfg.mweight_volume.volume_size).astype('float32')
 
+        # load cameras from cameras.pkl
         cameras = self.load_train_cameras()
+        # load mesh_infos dict from mesh_info.pkl
         mesh_infos = self.load_train_mesh_infos()
+        # get train frames from dataset/zju_mocap/images
         framelist = self.load_train_frames() 
 
         # reduce number of frames if skip > 1
+        # skip is from core.data.create_dataset.create_dataset
+        # args['skip'] = cfg.render_skip 
+        # default skip = 1
         self.framelist = framelist[::skip]
         if maxframes > 0:
             self.framelist = self.framelist[:maxframes]  
 
-        # get freeview_frame_indx from default.yaml 
+        # get freeview_frame_indx from
+        # python run.py \
+        # --type freeview \
+        # --cfg configs/human_nerf/zju_mocap/387/adventure.yaml \
+        # freeview.frame_idx 128
         self.train_frame_idx = cfg.freeview.frame_idx
         print(f' -- Frame Idx: {self.train_frame_idx}')
 
@@ -70,33 +85,48 @@ class Dataset(torch.utils.data.Dataset):
         self.total_frames = cfg.render_frames
         print(f' -- Total Rendered Frames: {self.total_frames}')
 
+        # get the image file name at the self.train_frame_idx location
+        # in the framelist from dataset/zju_mocap/images
         self.train_frame_name = framelist[self.train_frame_idx]
+        # get the camera for the seld.train_frame_idx location
+        # from the cameras.pkl file
         self.train_camera = cameras[framelist[self.train_frame_idx]]
+        # get the train mesh_info for the self.train_frame_idx location
+        # from the mesh_info.pkl file
         self.train_mesh_info = mesh_infos[framelist[self.train_frame_idx]]
-
+        # keyfilter, src_type from dataset_args.py
         self.bgcolor = bgcolor if bgcolor is not None else [255., 255., 255.]
         self.keyfilter = keyfilter
         self.src_type = src_type
+        ##
+        # end of constructor
 
     def load_canonical_joints(self):
+        # create the path to canonical joints pkl file
         cl_joint_path = os.path.join(self.dataset_path, 'canonical_joints.pkl')
+        # open the pkl file
         with open(cl_joint_path, 'rb') as f:
             cl_joint_data = pickle.load(f)
+        # get the canonical joints from the .pkl file
         canonical_joints = cl_joint_data['joints'].astype('float32')
+        # create a bbox from canonical skeleton
         canonical_bbox = self.skeleton_to_bbox(canonical_joints)
-
+        # return bbox and joints
         return canonical_joints, canonical_bbox
 
     def load_train_cameras(self):
+        # set camera object to empty
         cameras = None
+        # set camera object to contents of cameras.pkl file
         with open(os.path.join(self.dataset_path, 'cameras.pkl'), 'rb') as f: 
             cameras = pickle.load(f)
+        # return cameras
         return cameras
 
+    @staticmethod
     # convert skeleton to bbox by taking the min and max 
     # of the skeleton coordinates and +/- a offset to ensure extra
     # space
-    @staticmethod
     def skeleton_to_bbox(skeleton):
         min_xyz = np.min(skeleton, axis=0) - cfg.bbox_offset
         max_xyz = np.max(skeleton, axis=0) + cfg.bbox_offset
@@ -110,14 +140,21 @@ class Dataset(torch.utils.data.Dataset):
         mesh_infos = None
         with open(os.path.join(self.dataset_path, 'mesh_infos.pkl'), 'rb') as f:   
             mesh_infos = pickle.load(f)
-
+        # get frame_name from mesh_info.keys()
         for frame_name in mesh_infos.keys():
+            # set bbox to bbox obtained from the joints for each frame
             bbox = self.skeleton_to_bbox(mesh_infos[frame_name]['joints'])
+            # for each frame store bbox as a dict with
+            # key 'bbox' and value bbox
+            # in the frame_name th index of the mesh_infos list
             mesh_infos[frame_name]['bbox'] = bbox
-
+        # return mesh_infos for all frames as list
         return mesh_infos
 
     def load_train_frames(self):
+        # go to dataset/zju_mocap/{sub}/images
+        # get list of all files
+        # cocatenate and return paths in img_paths var
         img_paths = list_files(os.path.join(self.dataset_path, 'images'),
                                exts=['.png'])
         return [split_path(ipath)[1] for ipath in img_paths]

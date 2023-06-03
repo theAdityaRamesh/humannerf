@@ -11,6 +11,8 @@ from core.utils.image_util import ImageWriter, to_8b_image, to_8b3ch_image
 
 from configs import cfg, args
 
+# exclude these from passing on to gpu
+# in cpu_data_to_gpu_function
 EXCLUDE_KEYS_TO_GPU = ['frame_name',
                        'img_width', 'img_height', 'ray_mask']
 
@@ -75,12 +77,19 @@ def unpack_to_image(width, height, ray_mask, bgcolor,
 def _freeview(
         data_type='freeview',
         folder_name=None):
+    
+    # _freeview(
+    #     data_type='freeview',
+    #     folder_name=f"freeview_{cfg.freeview.frame_idx}" \
+    #         if not cfg.render_folder_name else cfg.render_folder_name)
+
     cfg.perturb = 0.
 
     # load the latest saved model
     # from checkpoint
     model = load_network()
     # create the test dataloader
+    # with data-type ='freeview'
     test_loader = create_dataloader(data_type)
     # create an instance of the image writer class
     # pass the output directory to constructor
@@ -150,8 +159,10 @@ def _freeview(
         # rgb_image(NVS) | ground_truth | alpha_map
         img_out = np.concatenate(imgs, axis=1)
         # add img_out to image writer class
+        # save the img_out variable as a png image
         writer.append(img_out)
 
+    # does nothing
     writer.finalize()
 
 

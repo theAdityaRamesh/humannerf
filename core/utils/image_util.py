@@ -59,7 +59,12 @@ def tile_images(images, imgs_per_row=4):
 
      
 class ImageWriter():
+    # take as input to constructor
+    # output directory
+    # experiment name
     def __init__(self, output_dir, exp_name):
+        # create image directory path
+        # from output directory and experiment name.
         self.image_dir = os.path.join(output_dir, exp_name)
 
         print("The rendering is saved in " + \
@@ -69,15 +74,24 @@ class ImageWriter():
         if os.path.exists(self.image_dir):
             shutil.rmtree(self.image_dir)
         
+        # create a directory at path image_dir
         os.makedirs(self.image_dir, exist_ok=True)
         self.frame_idx = -1
 
     def append(self, image, img_name=None):
+        # increase frame indx by one 
+        # on appending image to Image Writer
         self.frame_idx += 1
         if img_name is None:
+            # if no image name is provided
+            # name the images in order of 
+            # which they were appended
             img_name = f"{self.frame_idx:06d}"
+        # save the image as png
         save_image(image, f'{self.image_dir}/{img_name}.png')
+        # return frame indx and image name.
         return self.frame_idx, img_name
 
+    # unused code
     def finalize(self):
         pass
