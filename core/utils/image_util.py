@@ -17,14 +17,20 @@ def save_image(image_numpy, image_path):
 
 
 def to_8b_image(image):
+    # numpy.clip(a, a_min, a_max, out=None, **kwargs)
     return (255.* np.clip(image, 0., 1.)).astype(np.uint8)
 
 
 def to_3ch_image(image):
+    # if image.shape =(h,w)
     if len(image.shape) == 2:
+        # stack the image thrice
         return np.stack([image, image, image], axis=-1)
+        # if image shape is (h,w,1)
     elif len(image.shape) == 3:
+        # check if 3rd dim is = 1
         assert image.shape[2] == 1
+        # concatenate image
         return np.concatenate([image, image, image], axis=-1)
     else:
         print(f"to_3ch_image: Unsupported Shapes: {len(image.shape)}")
@@ -32,6 +38,8 @@ def to_3ch_image(image):
 
 
 def to_8b3ch_image(image):
+    # convert input to unit8 format b/w 0->255
+    # return 3channel image of that image
     return to_3ch_image(to_8b_image(image))
 
 

@@ -146,14 +146,18 @@ class Trainer(object):
             self.optimizer.zero_grad()
 
             # only access the first batch as we process one image one time
+            # find out what this means ???????? v[0]
             for k, v in batch.items():
                 batch[k] = v[0]
 
             batch['iter_val'] = torch.full((1,), self.iter)
+
+            # move data to gpu from cpu
             data = cpu_data_to_gpu(
                 batch, exclude_keys=EXCLUDE_KEYS_TO_GPU)
             net_output = self.network(**data)
 
+            # get the loss for the current batch
             train_loss, loss_dict = self.get_loss(
                 net_output=net_output,
                 patch_masks=data['patch_masks'],
@@ -161,9 +165,12 @@ class Trainer(object):
                 targets=data['target_patches'],
                 div_indices=data['patch_div_indices'])
 
+            # take a gradient step
             train_loss.backward()
             self.optimizer.step()
 
+            # print to command line 
+            # about loss,epoch and other details
             if self.iter % cfg.train.log_interval == 0:
                 loss_str = f"Loss: {train_loss.item():.4f} ["
                 for k, v in loss_dict.items():
@@ -197,6 +204,8 @@ class Trainer(object):
                 self.iter += 1
     
     def finalize(self):
+        # save check point for current 
+        # model params at the current iteration
         self.save_ckpt('latest')
 
     ######################################################3

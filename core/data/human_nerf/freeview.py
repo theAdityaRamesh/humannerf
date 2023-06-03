@@ -55,15 +55,18 @@ class Dataset(torch.utils.data.Dataset):
 
         cameras = self.load_train_cameras()
         mesh_infos = self.load_train_mesh_infos()
-
         framelist = self.load_train_frames() 
+
+        # reduce number of frames if skip > 1
         self.framelist = framelist[::skip]
         if maxframes > 0:
             self.framelist = self.framelist[:maxframes]  
 
+        # get freeview_frame_indx from default.yaml 
         self.train_frame_idx = cfg.freeview.frame_idx
         print(f' -- Frame Idx: {self.train_frame_idx}')
 
+        # set in core.configs.config.py file        
         self.total_frames = cfg.render_frames
         print(f' -- Total Rendered Frames: {self.total_frames}')
 
@@ -90,6 +93,9 @@ class Dataset(torch.utils.data.Dataset):
             cameras = pickle.load(f)
         return cameras
 
+    # convert skeleton to bbox by taking the min and max 
+    # of the skeleton coordinates and +/- a offset to ensure extra
+    # space
     @staticmethod
     def skeleton_to_bbox(skeleton):
         min_xyz = np.min(skeleton, axis=0) - cfg.bbox_offset
@@ -138,6 +144,11 @@ class Dataset(torch.utils.data.Dataset):
         return K, E
 
     def load_image(self, frame_name, bg_color):
+        '''
+            create a image
+            without background
+            return resized image
+        '''
         imagepath = os.path.join(self.image_dir, '{}.png'.format(frame_name))
         orig_img = np.array(load_image(imagepath))
 
@@ -146,6 +157,8 @@ class Dataset(torch.utils.data.Dataset):
                                 '{}.png'.format(frame_name))
         alpha_mask = np.array(load_image(maskpath))
         
+        # https://docs.opencv.org/4.x/dc/dbb/tutorial_py_calibration.html
+        # correct for lens distortions
         if 'distortions' in self.train_camera:
             K = self.train_camera['intrinsics']
             D = self.train_camera['distortions']
@@ -153,7 +166,11 @@ class Dataset(torch.utils.data.Dataset):
             alpha_mask = cv2.undistort(alpha_mask, K, D)
 
         alpha_mask = alpha_mask / 255.
+        # mask out the background pixels by using the alpha mask
+        # colour the non-foregroung pixels to bg_color
         img = alpha_mask * orig_img + (1.0 - alpha_mask) * bg_color[None, None, :]
+        # resize image and alpha mask accr to factor in adventure.yaml
+        # WHY ??
         if cfg.resize_img_scale != 1.:
             img = cv2.resize(img, None, 
                              fx=cfg.resize_img_scale,

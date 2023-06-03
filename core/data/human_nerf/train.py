@@ -52,16 +52,24 @@ class Dataset(torch.utils.data.Dataset):
         self.mesh_infos = self.load_train_mesh_infos()
 
         framelist = self.load_train_frames()
+
+        # change framelist to
+        # framelist[1:skip:end]
         self.framelist = framelist[::skip]
+
+        # restrict to only maxframes number of frames.
         if maxframes > 0:
             self.framelist = self.framelist[:maxframes]
+        # print(len(self.framelist))
         print(f' -- Total Frames: {self.get_total_frames()}')
 
         self.keyfilter = keyfilter
         self.bgcolor = bgcolor
-
         self.ray_shoot_mode = ray_shoot_mode
-
+    
+    # $$$$$$$$$$$$$$$$$
+    # is this the joints of the canonical pose ?
+    # $$$$$$$$$$$$$$$$$
     def load_canonical_joints(self):
         cl_joint_path = os.path.join(self.dataset_path, 'canonical_joints.pkl')
         with open(cl_joint_path, 'rb') as f:
@@ -71,6 +79,7 @@ class Dataset(torch.utils.data.Dataset):
 
         return canonical_joints, canonical_bbox
 
+    # load train cameras from cameras.pkl
     def load_train_cameras(self):
         cameras = None
         with open(os.path.join(self.dataset_path, 'cameras.pkl'), 'rb') as f: 
@@ -78,6 +87,7 @@ class Dataset(torch.utils.data.Dataset):
         return cameras
 
     @staticmethod
+    # convert the skeleton to bbox by +/- an offset
     def skeleton_to_bbox(skeleton):
         min_xyz = np.min(skeleton, axis=0) - cfg.bbox_offset
         max_xyz = np.max(skeleton, axis=0) + cfg.bbox_offset
@@ -98,6 +108,7 @@ class Dataset(torch.utils.data.Dataset):
 
         return mesh_infos
 
+    # dataset path from dataset args
     def load_train_frames(self):
         img_paths = list_files(os.path.join(self.dataset_path, 'images'),
                                exts=['.png'])
